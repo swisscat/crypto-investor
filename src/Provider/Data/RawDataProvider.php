@@ -86,35 +86,71 @@ class RawDataProvider
 
     public function getReturnOnInvestment(DateTime $startDate, DateTime $endDate)
     {
-        $values = [];
-        $dollarValues = [];
+        return $this->getReturnReinvestedOnInvestment($startDate, $endDate, 0, 0);
+    }
+
+    public function getReturnReinvestedOnInvestment(DateTime $startDate, DateTime $endDate, $percentageKept, $keepReinvestingDays)
+    {
+        $percentageKept = (100 - $percentageKept) / 100;
+        $contractLength = 365;
+
         $profit = $this->getProfit($startDate, Carbon::now());
         $prices = $this->getPrices($startDate, Carbon::now());
 
-        $roiDays = 0;
+        $investPrice = ['btc' => $this->getHashPrice($prices[$dateKey = $startDate->format(self::DateFormat)]), 'usd' => $this->getHashPrice(1)];
 
-        $investPrice = $this->getHashPrice($this->getPrices($startDate, $startDate)[$startDate->format(self::DateFormat)]);
+        $amountValues = [$dateKey => ['btc' => 0, 'usd' => 0]];
+        $hashrateValues = [$dateKey => 1];
 
-        $dollarInvestPrice = $this->getHashPrice(1);
+        $startDate = Carbon::instance($startDate);
+        $iterationDate = Carbon::instance($startDate);
 
-        $earnedPrice = 0;
-        $earnedPriceDollars = 0;
-        $date = $startDate;
+        $dayBefore = clone $startDate;
+        $dayBefore->addDay(-1);
+        $hashrateValues[$dayBefore->format(self::DateFormat)] = 0;
 
-        $date = Carbon::instance($date);
-        while ($date < $endDate) {
-            $earnedPrice += $profit[$key = $date->format(self::DateFormat)];
-            $values[$key] = $earnedPrice;
+        while ($iterationDate < $endDate) {
+            $previousDay = clone $iterationDate;
+            $iterationDate->addDay(1);
+            $iterationDays = $iterationDate->diffInDays($startDate);
+            $dateKey = $iterationDate->format(self::DateFormat);
+            $previousDayKey = $previousDay->format(self::DateFormat);
 
-            $earnedPriceDollars += $profit[$key = $date->format(self::DateFormat)] * $prices[$key = $date->format(self::DateFormat)];
-            $dollarValues[$key] = $earnedPriceDollars;
-            $date->addDay(1);
+            $previousHashrate = $hashrateValues[$previousDayKey];
 
-            if ($earnedPrice >= $investPrice) {
-                $roiDays = $date->diffInDays(Carbon::instance($startDate));
+            if ($iterationDays < $keepReinvestingDays) {
+                $amountIncrease = $profit[$dateKey] * $previousHashrate;
+                $amountValues[$dateKey]['btc'] = $amountValues[$previousDayKey]['btc'] + $amountIncrease * $percentageKept;
+                $amountValues[$dateKey]['usd'] = $amountValues[$previousDayKey]['usd'] + $amountIncrease * $percentageKept * $prices[$dateKey];
+
+                if ($iterationDays < $contractLength) {
+                    $hashrateValues[$dateKey] = $previousHashrate + $amountIncrease * (1.0 - $percentageKept) / $this->getHashPrice($prices[$dateKey]);
+                } else {
+                    $dayYearBefore = clone $iterationDate;
+                    $dayYearBefore->addYear(-1);
+
+                    $hashrateValues[$dateKey] = $previousHashrate + $amountIncrease * (1.0 - $percentageKept) / $this->getHashPrice($prices[$dateKey]) - $hashrateValues[$dayYearBefore->format(self::DateFormat)];
+                }
+            } else {
+                $amountIncrease = $profit[$dateKey] * $previousHashrate;
+                $amountValues[$dateKey]['btc'] = $amountValues[$previousDayKey]['btc'] + $amountIncrease;
+                $amountValues[$dateKey]['usd'] = $amountValues[$previousDayKey]['usd'] + $amountIncrease * $prices[$dateKey];
+
+
+                if ($iterationDays < $contractLength) {
+                    $hashrateValues[$dateKey] = $previousHashrate;
+                } else {
+                    $dayYearBefore = clone $iterationDate;
+                    $dayYearBefore->addYear(-1);
+
+                    $dayYearBeforeBefore = clone $dayYearBefore;
+                    $dayYearBeforeBefore->addDay(-1);
+
+                    $hashrateValues[$dateKey] = $previousHashrate + ($hashrateValues[$dayYearBeforeBefore->format(self::DateFormat)] ?? 0) - ($hashrateValues[$dayYearBefore->format(self::DateFormat)] ?? 0);
+                }
             }
         }
 
-        return compact('values', 'roiDays', 'investPrice', 'dollarValues', 'dollarInvestPrice');
+        return compact('amountValues', 'hashrateValues', 'investPrice');
     }
 }

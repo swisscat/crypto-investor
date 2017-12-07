@@ -26,7 +26,7 @@ class DataController extends Controller
         return new JsonResponse($this->dataProvider->getProfit(DateTime::createFromFormat(RawDataProvider::DateFormat, $startDate), DateTime::createFromFormat(RawDataProvider::DateFormat, $endDate)));
     }
 
-    public function getInvestmentMetrics($startDate = null, $endDate = null)
+    public function getInvestmentMetrics($startDate = null, $endDate = null, $percRebought = null, $fullProfit = null)
     {
         $startDate = DateTime::createFromFormat(RawDataProvider::DateFormat, $startDate);
         $endDate = DateTime::createFromFormat(RawDataProvider::DateFormat, $endDate);
@@ -34,7 +34,8 @@ class DataController extends Controller
         return new JsonResponse([
             'prices' => $this->dataProvider->getPrices($startDate, $endDate),
             'profit' => $this->dataProvider->getProfit($startDate, $endDate),
-            'return' => $this->dataProvider->getReturnOnInvestment($startDate, $endDate)
+            'return' => $this->dataProvider->getReturnOnInvestment($startDate, $endDate),
+            'returnReinvest' => $this->dataProvider->getReturnReinvestedOnInvestment($startDate, $endDate, $percRebought, $fullProfit),
         ]);
     }
 }

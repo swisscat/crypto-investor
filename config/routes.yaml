@@ -11,5 +11,5 @@ btc_profit:
     defaults: { _controller: 'App\Controller\DataController::profit', startDate: null, endDate: null }
 
 btc_invest:
-    path: /invest/btc/{startDate}/{endDate}
-    defaults: { _controller: 'App\Controller\DataController::getInvestmentMetrics', startDate: null, endDate: null }
+    path: /invest/btc/{startDate}/{endDate}/{percRebought}/{fullProfit}
+    defaults: { _controller: 'App\Controller\DataController::getInvestmentMetrics', startDate: null, endDate: null, percRebought: null, fullProfit: null s}

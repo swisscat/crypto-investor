@@ -24,6 +24,17 @@
                 <ul class="navbar-nav mr-auto">
                 </ul>
                 <form class="form-inline my-2 my-lg-0">
+                    <label class="sr-only" for="percRebought">% rebought</label>
+                    <div class="input-group mb-2 mr-sm-2 mb-sm-0">
+                        <div class="input-group-addon">% rebought</div>
+                        <input type="text" class="form-control" id="percRebought" value="100">
+                    </div>
+
+                    <label class="sr-only" for="fullProfit">Full profit</label>
+                    <div class="input-group mb-2 mr-sm-2 mb-sm-0">
+                        <div class="input-group-addon">Full profit after (days)</div>
+                        <input type="text" class="form-control" id="fullProfit" value="40">
+                    </div>
                     <div class="input-group input-daterange">
                         <input type="text" class="form-control daterange">
                     </div>
@@ -42,6 +53,8 @@
                     <canvas id="btcProfit"></canvas>
                 </div>
             </div>
+            <br />
+            <br />
             <div class="row">
                 <div class="col">
                     <h4 class="text-center">Investment vs mining</h4>
@@ -52,12 +65,49 @@
                     <canvas id="dollarInvest"></canvas>
                 </div>
             </div>
+            <br />
+            <br />
+            <div class="row">
+                <div class="col">
+                    <h4 class="text-center">Investment vs mining (complex)</h4>
+                    <canvas id="reinvest"></canvas>
+                </div>
+                <div class="col">
+                </div>
+            </div>
         </div>
         <script>
-
             const localeFormat = 'YYYY-MM-DD';
-            const startDate = moment().subtract(5, 'months');
-            const endDate = moment();
+            const startDate = moment().subtract(16, 'months');
+            const endDate = moment().subtract(1, 'days');
+
+            function createChart(id, params) {
+                return new Chart($('#' + id), $.extend(true, {
+                    type: 'line',
+                    data: {
+                        datasets: [
+                            {
+                                label: 'Bitcoin Price',
+                                data: [
+                                ]
+                            }
+                        ]
+                    },
+                    options: {
+                        legend: {
+                            display: false
+                        },
+                        scales: {
+                            xAxes: [
+                                {
+                                    type: 'time',
+                                    distribution: 'series'
+                                }
+                            ]
+                        }
+                    }
+                }, params || {}));
+            }
 
             var dateRangeConfig = {
                 locale: {
@@ -67,181 +117,116 @@
                 endDate: endDate.format(localeFormat)
             };
 
-            var priceChart = new Chart($('#btcPrices'), {
-                type: 'line',
-                data: {
-                    datasets: [
-                        {
-                            label: 'Bitcoin Price',
-                            data: [
+            var charts = {
+                price: createChart('btcPrices'),
+                profit: createChart('btcProfit'),
+                invest: createChart('invest', {options: {legend: {display: true}}}),
+                dollarInvest: createChart('dollarInvest', {options: {legend: {display: true}}}),
+                reinvest: createChart('reinvest', {
+                    options: {
+                        legend: {
+                            display: true
+                        },
+                        scales: {
+                            xAxes: [
+                                {
+                                    type: 'time',
+                                    distribution: 'series'
+                                }
+                            ],
+                            yAxes: [
+                                {
+                                    id: 'A',
+                                    type: 'linear',
+                                    position: 'left'
+                                },
+                                {
+                                    id: 'B',
+                                    type: 'linear',
+                                    position: 'right'
+                                }
                             ]
                         }
-                    ]
-                },
-                options: {
-                    legend: {
-                        display: false
-                    },
-                    scales: {
-                        xAxes: [
-                            {
-                                type: 'time',
-                                distribution: 'series'
-                            }
-                        ]
                     }
-                }
-            });
-            var profitChart = new Chart($('#btcProfit'), {
-                type: 'line',
-                data: {
-                    datasets: [
-                        {
-                            label: 'Bitcoin Price',
-                            data: [
-                            ]
-                        }
-                    ]
-                },
-                options: {
-                    legend: {
-                        display: false
-                    },
-                    scales: {
-                        xAxes: [
-                            {
-                                type: 'time',
-                                distribution: 'series'
-                            }
-                        ]
-                    }
-                }
-            });
+                })
+            };
 
-            var investChart = new Chart($('#invest'), {
-                type: 'line',
-                data: {
-                    datasets: [
-                    ]
-                },
-                options: {
-                    scales: {
-                        xAxes: [
-                            {
-                                type: 'time',
-                                distribution: 'series'
-                            }
-                        ]
-                    }
+            function generateDataSet(data, label) {
+                var dataset = {
+                    'label': label || 'DataSet',
+                    'data': []
                 }
-            });
 
-            var dollarInvestChart = new Chart($('#dollarInvest'), {
-                type: 'line',
-                data: {
-                    datasets: [
-                    ]
-                },
-                options: {
-                    scales: {
-                        xAxes: [
-                            {
-                                type: 'time',
-                                distribution: 'series'
-                            }
-                        ]
+                for (var key in data) {
+                    dataset.data.push({
+                        x: new Date(key),
+                        y: data[key]
+                    })
+                }
+
+                return dataset;
+            }
+
+            function generateComparisonDataSet(data, currency, withHashRate, label) {
+                var datasets = [
+                    {
+                        label: 'Initial Buy',
+                        data: []
+                    },
+                    {
+                        label: label || 'Mining Returns',
+                        data: []
+                    }
+                ];
+
+                withHashRate = withHashRate || false;
+
+                if (withHashRate) {
+                    datasets.push(
+                    {
+                        label: 'Hash Rate',
+                            yAxisID: 'B',
+                        data: []
+                    }
+                    );
+                }
+
+                for (var key in data.amountValues) {
+                    var date = new Date(key);
+
+                    datasets[0].data.push({
+                        x: date,
+                        y: data.investPrice[currency]
+                    });
+
+                    datasets[1].data.push({
+                        x: date,
+                        y: data.amountValues[key][currency]
+                    });
+
+                    if (withHashRate) {
+                        datasets[2].data.push({
+                            x: date,
+                            y: data.hashrateValues[key]
+                        });
                     }
                 }
-            });
+
+                return datasets;
+            }
 
             function drawGraphs(start, end) {
-                $.ajax('{{ path('btc_invest') }}' + '/' + start.format(localeFormat) + '/' + end.format(localeFormat), {
+                $.ajax('{{ path('btc_invest') }}' + '/' + start.format(localeFormat) + '/' + end.format(localeFormat) + '/' + ($('#percRebought').prop('value') || 100) + '/' + ($('#fullProfit').prop('value') || 0), {
                     success: function(data) {
-                        priceChart.data.datasets[0].data = [];
+                        charts.price.data.datasets = [generateDataSet(data.prices)];
+                        charts.profit.data.datasets = [generateDataSet(data.profit)];
+                        charts.invest.data.datasets = generateComparisonDataSet(data.return, 'btc', false);
+                        charts.dollarInvest.data.datasets = generateComparisonDataSet(data.return, 'usd', false);
+                        charts.reinvest.data.datasets = generateComparisonDataSet(data.returnReinvest, 'btc', true);
 
-                        for (date in data.prices) {
-                            priceChart.data.datasets[0].data.push({
-                                x: new Date(date),
-                                y: data.prices[date]
-                            });
+                        for (var chart in charts) {
+                            charts[chart].update();
                         }
-
-                        profitChart.data.datasets[0].data = [];
-
-                        for (date in data.profit) {
-                            profitChart.data.datasets[0].data.push({
-                                x: new Date(date),
-                                y: data.profit[date]
-                            });
-                        }
-
-                        // Investment
-
-                        investChart.data.datasets = [];
-
-                        var fixedBuy = {
-                            label: 'Fixed buy',
-                            data: []
-                        };
-
-                        var miningReturns = {
-                            'label': 'Mining returns',
-                            data: []
-                        }
-
-
-                        for (date in data.return.values) {
-                            var actualDate = new Date(date);
-
-                            fixedBuy.data.push({
-                                x: actualDate,
-                                y: data.return.investPrice
-                            });
-
-                            miningReturns.data.push({
-                                x: actualDate,
-                                y: data.return.values[date]
-                            });
-                        }
-
-                        investChart.data.datasets.push(fixedBuy);
-                        investChart.data.datasets.push(miningReturns);
-
-                        dollarInvestChart.data.datasets = [];
-
-                        var dollarFixedBuy = {
-                            label: 'Fixed buy',
-                            data: []
-                        };
-
-                        var dollarMiningReturns = {
-                            'label': 'Mining returns',
-                            data: []
-                        }
-
-
-                        for (date in data.return.dollarValues) {
-                            var actualDate = new Date(date);
-
-                            dollarFixedBuy.data.push({
-                                x: actualDate,
-                                y: data.return.dollarInvestPrice
-                            });
-
-                            dollarMiningReturns.data.push({
-                                x: actualDate,
-                                y: data.return.dollarValues[date]
-                            });
-                        }
-
-                        dollarInvestChart.data.datasets.push(dollarFixedBuy);
-                        dollarInvestChart.data.datasets.push(dollarMiningReturns);
-
-
-                        priceChart.update();
-                        profitChart.update();
-                        investChart.update();
-                        dollarInvestChart.update();
                     },
                     error: function() {
                         console.log('callError');
@@ -250,10 +235,16 @@
             }
 
             $(function() {
-                $('.daterange').daterangepicker(dateRangeConfig, function(start, end, label) {
+                var $daterange = $('.daterange');
+
+                $daterange.daterangepicker(dateRangeConfig, function(start, end) {
                     drawGraphs(start, end);
                 });
-            })
+
+                $('#percRebought,#fullProfit').change(function(){
+                    drawGraphs($daterange.data('daterangepicker').startDate, $daterange.data('daterangepicker').endDate);
+                })
+            });
 
             drawGraphs(startDate, endDate);
         </script>
