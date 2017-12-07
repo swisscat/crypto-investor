@@ -1,0 +1,15 @@
+index:
+    path: /
+    defaults: { _controller: 'App\Controller\DefaultController::index' }
+
+btc_prices:
+    path: /prices/btc/{startDate}/{endDate}
+    defaults: { _controller: 'App\Controller\DataController::prices', startDate: null, endDate: null }
+
+btc_profit:
+    path: /profit/btc/{startDate}/{endDate}
+    defaults: { _controller: 'App\Controller\DataController::profit', startDate: null, endDate: null }
+
+btc_invest:
+    path: /invest/btc/{startDate}/{endDate}
+    defaults: { _controller: 'App\Controller\DataController::getInvestmentMetrics', startDate: null, endDate: null }

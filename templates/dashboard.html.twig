@@ -1,0 +1,261 @@
+<html>
+    <head>
+        <title>Crypto-Investor</title>
+        <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tether/1.4.3/js/tether.min.js"></script>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/js/bootstrap.min.js" integrity="sha384-vBWWzlZJ8ea9aCX4pEW3rVHjgjt7zpkNpZk+02D9phzyeVkE+jo0ieGizqPLForn" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.1/Chart.bundle.min.js"></script>
+        <script type="text/javascript" src="//cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-daterangepicker/2.1.25/daterangepicker.min.css" integrity="sha256-RqJuUJ19HEfsKUNMC+6GLSatrHeroWygib75lro4BMU=" crossorigin="anonymous" />
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-daterangepicker/2.1.25/daterangepicker.min.js" integrity="sha256-WniDtKHyk2OPgNtTFKu/sL8zGBzmCfMcmEKRAqfi25c=" crossorigin="anonymous"></script>
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    </head>
+    <body>
+        <nav class="navbar navbar-toggleable-md navbar-light bg-faded sticky-top">
+            <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand" href="#">Crypto-Investor</a>
+
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                <ul class="navbar-nav mr-auto">
+                </ul>
+                <form class="form-inline my-2 my-lg-0">
+                    <div class="input-group input-daterange">
+                        <input type="text" class="form-control daterange">
+                    </div>
+                </form>
+            </div>
+        </nav>
+        <br />
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col">
+                    <h4 class="text-center">Bitcoin Price</h4>
+                    <canvas id="btcPrices"></canvas>
+                </div>
+                <div class="col">
+                    <h4 class="text-center">Bitcoin Profitability</h4>
+                    <canvas id="btcProfit"></canvas>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <h4 class="text-center">Investment vs mining</h4>
+                    <canvas id="invest"></canvas>
+                </div>
+                <div class="col">
+                    <h4 class="text-center">Investment vs mining (USD)</h4>
+                    <canvas id="dollarInvest"></canvas>
+                </div>
+            </div>
+        </div>
+        <script>
+
+            const localeFormat = 'YYYY-MM-DD';
+            const startDate = moment().subtract(5, 'months');
+            const endDate = moment();
+
+            var dateRangeConfig = {
+                locale: {
+                    format: localeFormat
+                },
+                startDate: startDate.format(localeFormat),
+                endDate: endDate.format(localeFormat)
+            };
+
+            var priceChart = new Chart($('#btcPrices'), {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Bitcoin Price',
+                            data: [
+                            ]
+                        }
+                    ]
+                },
+                options: {
+                    legend: {
+                        display: false
+                    },
+                    scales: {
+                        xAxes: [
+                            {
+                                type: 'time',
+                                distribution: 'series'
+                            }
+                        ]
+                    }
+                }
+            });
+            var profitChart = new Chart($('#btcProfit'), {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Bitcoin Price',
+                            data: [
+                            ]
+                        }
+                    ]
+                },
+                options: {
+                    legend: {
+                        display: false
+                    },
+                    scales: {
+                        xAxes: [
+                            {
+                                type: 'time',
+                                distribution: 'series'
+                            }
+                        ]
+                    }
+                }
+            });
+
+            var investChart = new Chart($('#invest'), {
+                type: 'line',
+                data: {
+                    datasets: [
+                    ]
+                },
+                options: {
+                    scales: {
+                        xAxes: [
+                            {
+                                type: 'time',
+                                distribution: 'series'
+                            }
+                        ]
+                    }
+                }
+            });
+
+            var dollarInvestChart = new Chart($('#dollarInvest'), {
+                type: 'line',
+                data: {
+                    datasets: [
+                    ]
+                },
+                options: {
+                    scales: {
+                        xAxes: [
+                            {
+                                type: 'time',
+                                distribution: 'series'
+                            }
+                        ]
+                    }
+                }
+            });
+
+            function drawGraphs(start, end) {
+                $.ajax('{{ path('btc_invest') }}' + '/' + start.format(localeFormat) + '/' + end.format(localeFormat), {
+                    success: function(data) {
+                        priceChart.data.datasets[0].data = [];
+
+                        for (date in data.prices) {
+                            priceChart.data.datasets[0].data.push({
+                                x: new Date(date),
+                                y: data.prices[date]
+                            });
+                        }
+
+                        profitChart.data.datasets[0].data = [];
+
+                        for (date in data.profit) {
+                            profitChart.data.datasets[0].data.push({
+                                x: new Date(date),
+                                y: data.profit[date]
+                            });
+                        }
+
+                        // Investment
+
+                        investChart.data.datasets = [];
+
+                        var fixedBuy = {
+                            label: 'Fixed buy',
+                            data: []
+                        };
+
+                        var miningReturns = {
+                            'label': 'Mining returns',
+                            data: []
+                        }
+
+
+                        for (date in data.return.values) {
+                            var actualDate = new Date(date);
+
+                            fixedBuy.data.push({
+                                x: actualDate,
+                                y: data.return.investPrice
+                            });
+
+                            miningReturns.data.push({
+                                x: actualDate,
+                                y: data.return.values[date]
+                            });
+                        }
+
+                        investChart.data.datasets.push(fixedBuy);
+                        investChart.data.datasets.push(miningReturns);
+
+                        dollarInvestChart.data.datasets = [];
+
+                        var dollarFixedBuy = {
+                            label: 'Fixed buy',
+                            data: []
+                        };
+
+                        var dollarMiningReturns = {
+                            'label': 'Mining returns',
+                            data: []
+                        }
+
+
+                        for (date in data.return.dollarValues) {
+                            var actualDate = new Date(date);
+
+                            dollarFixedBuy.data.push({
+                                x: actualDate,
+                                y: data.return.dollarInvestPrice
+                            });
+
+                            dollarMiningReturns.data.push({
+                                x: actualDate,
+                                y: data.return.dollarValues[date]
+                            });
+                        }
+
+                        dollarInvestChart.data.datasets.push(dollarFixedBuy);
+                        dollarInvestChart.data.datasets.push(dollarMiningReturns);
+
+
+                        priceChart.update();
+                        profitChart.update();
+                        investChart.update();
+                        dollarInvestChart.update();
+                    },
+                    error: function() {
+                        console.log('callError');
+                    }
+                });
+            }
+
+            $(function() {
+                $('.daterange').daterangepicker(dateRangeConfig, function(start, end, label) {
+                    drawGraphs(start, end);
+                });
+            })
+
+            drawGraphs(startDate, endDate);
+        </script>
+    </body>
+</html>
