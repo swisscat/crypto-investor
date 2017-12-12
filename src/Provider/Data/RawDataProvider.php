@@ -4,21 +4,68 @@ namespace App\Provider\Data;
 
 use Carbon\Carbon;
 use DateTime;
+use GuzzleHttp\Client;
 
 class RawDataProvider
 {
     const DateFormat = 'Y-m-d';
 
-    public function getPrices(DateTime $startDate, DateTime $endDate)
-    {/*
-        $client = new Client();
-        $res = $client->request('GET', sprintf('https://api.coindesk.com/v1/bpi/historical/close.json?start=%s&end=%s', $startDate, $endDate));
-
-        $json = json_decode($res->getBody()->getContents(), true);
-
-        return $json['bpi'];*/
-
+    public function getCachedPrices(DateTime $startDate, DateTime $endDate)
+    {
         $dataset = json_decode(file_get_contents(__DIR__.'/price.json'), true);
+
+        $afterStart = false;
+
+        $values = [];
+
+        foreach ($dataset as $date => $value) {
+            if ($date == $startDate->format(self::DateFormat)) {
+                $afterStart = true;
+            }
+
+
+            if ($afterStart) {
+                $values[$date] = $value;
+            }
+
+            if ($date == $endDate->format(self::DateFormat)) {
+                break;
+            }
+        }
+
+        return $values;
+    }
+
+    public function getPrices(DateTime $startDate, DateTime $endDate)
+    {
+        $prices = $this->getCachedPrices($startDate, $endDate);
+
+        $cachedPriceDates = array_keys($prices);
+
+        $lastDate = DateTime::createFromFormat(self::DateFormat, end($cachedPriceDates));
+
+        if ($lastDate < $endDate) {
+            $client = new Client();
+            $res = $client->request('GET', sprintf('https://api.coindesk.com/v1/bpi/historical/close.json?start=%s&end=%s', $lastDate->format(self::DateFormat), $endDate->format(self::DateFormat)));
+
+            $json = json_decode($res->getBody()->getContents(), true);
+
+            $prices = array_merge($prices, $json['bpi']);
+
+            $filePrices = array_merge($prices, json_decode(file_get_contents(__DIR__.'/price.json'), true));
+
+            ksort($filePrices);
+
+            // Cache
+            file_put_contents(__DIR__.'/price.json', json_encode($filePrices, JSON_PRETTY_PRINT));
+        }
+
+        return $prices;
+    }
+
+    public function getCachedProfit(DateTime $startDate, DateTime $endDate)
+    {
+        $dataset = json_decode(file_get_contents(__DIR__.'/mining.json'), true);
 
         $afterStart = false;
 
@@ -44,35 +91,54 @@ class RawDataProvider
 
     public function getProfit(DateTime $startDate, DateTime $endDate)
     {
-        $dataset = json_decode(file_get_contents(__DIR__.'/mining.json'), true);
+        $profits = $this->getCachedProfit($startDate, $endDate);
 
-        $afterStart = false;
+        $cachedPriceDates = array_keys($profits);
 
-        $values = [];
+        $lastDate = DateTime::createFromFormat(self::DateFormat, end($cachedPriceDates));
 
-        foreach ($dataset as $date => $value) {
-            if ($date == $startDate->format(self::DateFormat)) {
-                $afterStart = true;
+        if ($lastDate < $endDate) {
+            $client = new Client();
+            $res = $client->request('GET', 'https://bitinfocharts.com/comparison/bitcoin-mining_profitability.html');
+
+            $body = $res->getBody()->getContents();
+
+            $data = substr($body, $start = (strpos($body, 'new Dygraph(document.getElementById("container")') + strlen('new Dygraph(document.getElementById("container")') + 2), strpos($body, ']], {labels:') + 1 - $start);
+
+            while ($endBracketPos = strpos($data, ']')) {
+                $input_line = substr($data, 0, $endBracketPos+1);
+
+                $output_array = [];
+
+                preg_match("/\[new Date\(\"(.*)\"\),(.*)\]/", $input_line, $output_array);
+
+                $dateParsed = DateTime::createFromFormat('Y/m/d', $output_array[1]);
+
+                if ($dateParsed >= $startDate && $dateParsed <= $endDate) {
+                    $profits[$dateParsed->format(self::DateFormat)] = (float)$output_array[2];
+                }
+
+
+                $data = substr($data, $endBracketPos+2);
             }
 
+            $fileProfits = array_merge($profits, json_decode(file_get_contents(__DIR__.'/mining.json'), true));
 
-            if ($afterStart) {
-                $values[$date] = $value;
-            }
+            ksort($fileProfits);
 
-            if ($date == $endDate->format(self::DateFormat)) {
-                break;
-            }
+            // Cache
+            file_put_contents(__DIR__.'/mining.json', json_encode($fileProfits, JSON_PRETTY_PRINT));
         }
 
         $prices = $this->getPrices($startDate, $endDate);
 
-        foreach ($values as $date => $value) {
-            $values[$date] = $value / $prices[$date];
+        foreach ($profits as $date => $value) {
+            $profits[$date] = $value / $prices[$date];
         }
 
-        return $values;
+        return $profits;
     }
+
 
     public function getHashPrice($btcPrice)
     {
